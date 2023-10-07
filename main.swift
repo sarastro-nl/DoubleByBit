@@ -13,10 +13,9 @@ struct Double: Equatable {
             bytes |= 1 << 63
             d = -d
         }
-        let e = Int(floor(log2(d)))
-        guard e > -1023, e < 1025 else { fatalError() }
-        bytes |= UInt(e + 1023) << 52
-        bytes |= UInt(pow(2, 52) * (d / pow(2, floor(log2(d))) - 1))
+        let e = floor(log2(d))
+        bytes |= UInt(Int(e) + 1023) << 52
+        bytes |= UInt(pow(2, 52) * (d * pow(2, -e) - 1))
     }
     
     init(e: UInt, m: UInt) {
@@ -41,7 +40,7 @@ struct Double: Equatable {
     
     var doubleValue: Swift.Double {
         if self == .zero { return 0 }
-        let r = pow(2, Swift.Double(exponent - 1023)) * (Swift.Double(mantisse) / pow(2, 52) + 1)
+        let r = pow(2, Swift.Double(exponent - 1023)) * (Swift.Double(mantisse) * pow(2, -52) + 1)
         return isNegative ? -r : r
     }
 
