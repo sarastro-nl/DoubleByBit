@@ -30,7 +30,7 @@ struct Double: Equatable {
     
     var doubleValue: Swift.Double {
         if self == .zero { return 0 }
-        let r = pow(2, Swift.Double(exponent - 1023)) * (Swift.Double(mantisse) * pow(2, -52) + 1)
+        let r = pow(2, Swift.Double(Int(exponent) - 1023)) * (Swift.Double(mantisse) * pow(2, -52) + 1)
         return isNegative ? -r : r
     }
 
@@ -134,6 +134,32 @@ struct Double: Equatable {
         return Double(e: numerator.exponent + lhs.exponent - rhs.exponent, m: numerator.mantisse)
     }
     
+    static func abs(_ operand: Double) -> Double {
+        if operand.isNegative { return -operand }
+        return operand
+    }
+    
+    static func sqrt(_ operand: Double) -> Double {
+        if operand.isNegative { fatalError() }
+        if operand == .zero { return .zero }
+        if operand == .one { return .one }
+        let o: Double
+        var x: Double
+        if operand.exponent & 1 == 0 {
+            o = Double(e: 1024, m: operand.mantisse)
+            x = Double(e: 1023, m: (1 << 52 + o.mantisse) >> 1)
+        } else {
+            o = Double(e: 1023, m: operand.mantisse)
+            x = Double(e: 1023, m: o.mantisse >> 1)
+        }
+        let threshold = Double(e: 1023 - 48, m: 0)
+        while abs(o - (x * x)) > threshold {
+            x = x + o / x
+            x = Double(e: x.exponent - 1, m: x.mantisse)
+        }
+        return Double(e: UInt((Int(operand.exponent) - 1023) >> 1 + 1023), m: x.mantisse)
+    }
+    
     func myprint() {
         for i in (0...63).reversed() {
             if bytes & 1 << i > 0 {
@@ -145,21 +171,22 @@ struct Double: Equatable {
                 print(" ", terminator: "")
             }
         }
-        print()
+        print("")
     }
 }
 
-let ff = -40.0
+let ff = 33.0
 let gg = -3.0
-let ss = ff / gg
+let ss = sqrt(ff)
 
 let f = Double(ff)
 let g = Double(gg)
 let h = Double(ss)
-let s = f / g
+let s = Double.sqrt(f)
 print(ff)
 print(gg)
 print(ss)
+print(s.doubleValue)
 f.myprint()
 g.myprint()
 h.myprint()
