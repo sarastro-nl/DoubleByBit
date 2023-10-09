@@ -227,6 +227,33 @@ struct Double: Equatable {
         return Double(e: r.exponent + m, m: r.mantisse, n: r.isNegative)
     }
     
+    static func exp(_ operand: Double) -> Double {
+        if operand == .zero { return .one }
+        let o: Double
+        if operand.exponent > 1022 {
+            o = Double(e: 1022, m: operand.mantisse)
+        } else {
+            o = Double(e: operand.exponent, m: operand.mantisse)
+        }
+        var r = Double.one
+        var e = o
+        var fac = Double.two
+        while r + e != r {
+            r = r + e
+            e = e * o / fac
+            fac = fac + .one
+        }
+        var exponent = operand.exponent
+        while exponent > 1022 {
+            r = r * r
+            exponent -= 1
+        }
+        if operand.isNegative {
+            r = .one / r
+        }
+        return r
+    }
+    
     func myprint() {
         for i in (0...63).reversed() {
             if bytes & 1 << i > 0 {
@@ -242,14 +269,14 @@ struct Double: Equatable {
     }
 }
 
-let ff = 0.5
+let ff = -0.1296
 let gg = -3.0
-let ss = log(ff)
+let ss = exp(ff)
 
 let f = Double(ff)
 let g = Double(gg)
 let h = Double(ss)
-let s = Double.log(f)
+let s = Double.exp(f)
 print(ff)
 print(gg)
 print(ss)
