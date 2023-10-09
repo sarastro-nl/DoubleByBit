@@ -195,7 +195,7 @@ struct Double: Equatable {
         let square = -operand * operand
         var r = Double.zero
         var fac = Double.two
-        while abs(r + operand - r) > .zero {
+        while r + operand != r {
             r = r + operand
             operand = operand * square / (fac * (fac + .one))
             fac = fac + .two
@@ -208,27 +208,23 @@ struct Double: Equatable {
         if operand == .zero { fatalError() }
         if operand == .one { return .zero }
         var operand = operand
-        var m = 1
-        while operand > .two {
+        var m: UInt = 1
+        while operand < Double(e: 1022, m: 0) || operand > .two {
             operand = sqrt(operand)
             m += 1
-        }
-        while operand < Double(e: 1022, m: 0) {
-            operand = sqrt(operand)
-            m -= 1
         }
         operand = (operand - .one) / (operand + .one)
         let square = operand * operand
         var r = Double.zero
         var e = operand
         var n = Double.one
-        while abs(r + e - r) > .zero {
+        while r + e != r {
             r = r + e
             operand = operand * square
             n = n + .two
             e = operand / n
         }
-        return Double(e: UInt(Int(r.exponent) + m), m: r.mantisse, n: r.isNegative)
+        return Double(e: r.exponent + m, m: r.mantisse, n: r.isNegative)
     }
     
     func myprint() {
