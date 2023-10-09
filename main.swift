@@ -203,6 +203,34 @@ struct Double: Equatable {
         return r
     }
     
+    static func log(_ operand: Double) -> Double {
+        if operand.isNegative { fatalError() }
+        if operand == .zero { fatalError() }
+        if operand == .one { return .zero }
+        var operand = operand
+        var m = 1
+        while operand > .two {
+            operand = sqrt(operand)
+            m += 1
+        }
+        while operand < Double(e: 1022, m: 0) {
+            operand = sqrt(operand)
+            m -= 1
+        }
+        operand = (operand - .one) / (operand + .one)
+        let square = operand * operand
+        var r = Double.zero
+        var e = operand
+        var n = Double.one
+        while abs(r + e - r) > .zero {
+            r = r + e
+            operand = operand * square
+            n = n + .two
+            e = operand / n
+        }
+        return Double(e: UInt(Int(r.exponent) + m), m: r.mantisse, n: r.isNegative)
+    }
+    
     func myprint() {
         for i in (0...63).reversed() {
             if bytes & 1 << i > 0 {
@@ -218,14 +246,14 @@ struct Double: Equatable {
     }
 }
 
-let ff = 1.78539816339744830961566084581987572104929234984377
+let ff = 0.5
 let gg = -3.0
-let ss = sqrt(ff)
+let ss = log(ff)
 
 let f = Double(ff)
 let g = Double(gg)
 let h = Double(ss)
-let s = Double.sqrt(f)
+let s = Double.log(f)
 print(ff)
 print(gg)
 print(ss)
