@@ -159,8 +159,20 @@ struct Double: Equatable {
             x = x + o / x
             x = Double(e: x.exponent - 1, m: x.mantisse)
         }
-        return Double(e: UInt((Int(operand.exponent) - 1023) >> 1 + 1023), m: x.mantisse)
+        return Double(e: (operand.exponent + 1) >> 1 + 1023 - 512, m: x.mantisse)
     }
+    
+    static func cos(_ operand: Double) -> Double {
+        if operand == .zero { return .one }
+        return _sin(Double(e: 1021, m: 0) - normalize(abs(operand)))
+    }
+    
+    static func sin(_ operand: Double) -> Double {
+        if operand == .zero { return .zero }
+        return _sin(normalize(operand))
+    }
+    
+    static func tan(_ operand: Double) -> Double { sin(operand) / cos(operand) }
     
     static private func normalize(_ operand: Double) -> Double {
         let operand = operand * Double(e: 1020, m: 1230561511852163) // 1/(2*pi)
@@ -173,16 +185,6 @@ struct Double: Equatable {
         }
         mantisse -= 1 << 52
         return Double(e: exponent, m: mantisse, n: operand.isNegative)
-    }
-    
-    static func cos(_ operand: Double) -> Double {
-        if operand == .zero { return .one }
-        return _sin(Double(e: 1021, m: 0) - normalize(abs(operand)))
-    }
-    
-    static func sin(_ operand: Double) -> Double {
-        if operand == .zero { return .zero }
-        return _sin(normalize(operand))
     }
     
     static private func _sin(_ operand: Double) -> Double {
@@ -201,8 +203,6 @@ struct Double: Equatable {
         return r
     }
     
-    static func tan(_ operand: Double) -> Double { sin(operand) / cos(operand) }
-    
     func myprint() {
         for i in (0...63).reversed() {
             if bytes & 1 << i > 0 {
@@ -218,14 +218,14 @@ struct Double: Equatable {
     }
 }
 
-let ff = 0.78539816339744830961566084581987572104929234984377
+let ff = 1.78539816339744830961566084581987572104929234984377
 let gg = -3.0
-let ss = tan(ff)
+let ss = sqrt(ff)
 
 let f = Double(ff)
 let g = Double(gg)
 let h = Double(ss)
-let s = Double.tan(f)
+let s = Double.sqrt(f)
 print(ff)
 print(gg)
 print(ss)
