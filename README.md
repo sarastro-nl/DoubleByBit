@@ -12,6 +12,8 @@ It is stored as a `1.xxxxx` number times a power of `2` so the above number will
 
 `1.7202261612138196*2^-111`
 
-This is a swift implementation of how a computer might handle doubles under the hood when it comes to the basic operators like `<`, `>`, `+`, `-`, `*`, `/` and `sqrt`. It therefor uses bit operations only.
+This is a swift implementation of how a computer might handle doubles under the hood. It therefor uses bit operations only.
 
-The code doesn't focus on rounding errors or efficiency, it's just to show how calculations with doubles could be used with bit operations only.
+The following operations are supported: `<`, `>`, `+`, `-`, `*`, `/`, `sqrt`, `sin`, `cos` and `tan`. 
+
+For clarity reasons, the code is deliberately written without focus on rounding errors, overflow situations, `NaN`, `Inf` or efficiency, it's just to show how calculations with doubles could be done with bit operations only.

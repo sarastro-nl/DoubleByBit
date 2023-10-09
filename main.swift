@@ -2,7 +2,8 @@ import Foundation
 
 struct Double: Equatable {
     static let zero = Double(0)
-    static let one = Double(1)
+    static let one = Double(e: 1023, m: 0)
+    static let two = Double(e: 1024, m: 0)
 
     var bytes: UInt = 0
 
@@ -18,10 +19,11 @@ struct Double: Equatable {
         bytes |= UInt(pow(2, 52) * (d * pow(2, -e) - 1))
     }
     
-    init(e: UInt, m: UInt) {
+    init(e: UInt, m: UInt, n: Bool = false) {
         guard e > 0, e < 2048, m < 1 << 52 else { fatalError("out of bounds") }
         bytes = e << 52
         bytes |= m
+        if n { bytes |= 1 << 63}
     }
     
     var exponent: UInt { bytes >> 52 & (1 << 11 - 1) }
@@ -160,6 +162,47 @@ struct Double: Equatable {
         return Double(e: UInt((Int(operand.exponent) - 1023) >> 1 + 1023), m: x.mantisse)
     }
     
+    static private func normalize(_ operand: Double) -> Double {
+        let operand = operand * Double(e: 1020, m: 1230561511852163) // 1/(2*pi)
+        if operand.exponent < 1023 { return operand }
+        var exponent = operand.exponent
+        var mantisse = operand.mantisse & (1 << (52 - (operand.exponent - 1023)) - 1)
+        while mantisse & 1 << 52 == 0 {
+            exponent -= 1
+            mantisse <<= 1
+        }
+        mantisse -= 1 << 52
+        return Double(e: exponent, m: mantisse, n: operand.isNegative)
+    }
+    
+    static func cos(_ operand: Double) -> Double {
+        if operand == .zero { return .one }
+        return _sin(Double(e: 1021, m: 0) - normalize(abs(operand)))
+    }
+    
+    static func sin(_ operand: Double) -> Double {
+        if operand == .zero { return .zero }
+        return _sin(normalize(operand))
+    }
+    
+    static private func _sin(_ operand: Double) -> Double {
+        if operand.isNegative { return -_sin(-operand) }
+        if operand > Double(e: 1022, m: 0) { return -_sin(Double(e: 1023, m: 0) - operand) }
+        if operand > Double(e: 1021, m: 0) { return  _sin(Double(e: 1022, m: 0) - operand) }
+        var operand = operand * Double(e: 1025, m: 2570638124657944) // 2*pi
+        let square = -operand * operand
+        var r = Double.zero
+        var fac = Double.two
+        while abs(r + operand - r) > .zero {
+            r = r + operand
+            operand = operand * square / (fac * (fac + .one))
+            fac = fac + .two
+        }
+        return r
+    }
+    
+    static func tan(_ operand: Double) -> Double { sin(operand) / cos(operand) }
+    
     func myprint() {
         for i in (0...63).reversed() {
             if bytes & 1 << i > 0 {
@@ -175,14 +218,14 @@ struct Double: Equatable {
     }
 }
 
-let ff = 33.0
+let ff = 0.78539816339744830961566084581987572104929234984377
 let gg = -3.0
-let ss = sqrt(ff)
+let ss = tan(ff)
 
 let f = Double(ff)
 let g = Double(gg)
 let h = Double(ss)
-let s = Double.sqrt(f)
+let s = Double.tan(f)
 print(ff)
 print(gg)
 print(ss)
