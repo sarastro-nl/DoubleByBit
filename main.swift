@@ -246,6 +246,8 @@ struct Double: Equatable {
         return r
     }
     
+    static func ^ (lhs: Double, rhs: Double) -> Double { exp(log(lhs) * rhs) }
+    
     func myprint() {
         for i in (0...63).reversed() {
             if bytes & 1 << i > 0 {
@@ -261,14 +263,14 @@ struct Double: Equatable {
     }
 }
 
-let ff = -0.1296
+let ff = 1.1296
 let gg = -3.0
-let ss = exp(ff)
+let ss = pow(ff, gg)
 
 let f = Double(ff)
 let g = Double(gg)
 let h = Double(ss)
-let s = Double.exp(f)
+let s = f ^ g
 print(ff)
 print(gg)
 print(ss)
