@@ -60,30 +60,17 @@ struct Double: Equatable {
     static func + (lhs: Double, rhs: Double) -> Double {
         if lhs == .zero { return rhs }
         if rhs == .zero { return lhs }
-        if lhs.isNegative && rhs.isNegative { return -(-lhs + -rhs) }
-        if lhs.isNegative { return rhs - -lhs }
-        if rhs.isNegative { return lhs - -rhs }
-        if lhs < rhs { return rhs + lhs }
+        if lhs == -rhs { return .zero }
+        if abs(lhs) < abs(rhs) { return rhs + lhs }
+        if lhs.isNegative { return -(-lhs + -rhs) }
+        let lmantisse = 1 << 52 + lhs.mantisse
+        let rmantisse = (1 << 52 + rhs.mantisse) >> (lhs.exponent - rhs.exponent)
         var exponent = lhs.exponent
-        var mantisse = lhs.mantisse + (1 << 52 + rhs.mantisse) >> (lhs.exponent - rhs.exponent)
-        if mantisse >= 1 << 52 {
+        var mantisse = rhs.isNegative ? lmantisse - rmantisse : lmantisse + rmantisse
+        if mantisse & 1 << 53 > 0 {
             exponent += 1
-            mantisse -= 1 << 52
             mantisse >>= 1
         }
-        return Double(e: exponent, m: mantisse)
-    }
-
-    static func - (lhs: Double, rhs: Double) -> Double {
-        if lhs == .zero { return -rhs }
-        if rhs == .zero { return lhs }
-        if lhs == rhs { return .zero }
-        if lhs.isNegative && rhs.isNegative { return -rhs - -lhs }
-        if lhs.isNegative { return -(-lhs + rhs) }
-        if rhs.isNegative { return lhs + -rhs }
-        if lhs < rhs { return -(rhs - lhs) }
-        var exponent = lhs.exponent
-        var mantisse = 1 << 52 + lhs.mantisse - (1 << 52 + rhs.mantisse) >> (lhs.exponent - rhs.exponent)
         while mantisse & 1 << 52 == 0 {
             exponent -= 1
             mantisse <<= 1
@@ -91,6 +78,8 @@ struct Double: Equatable {
         mantisse -= 1 << 52
         return Double(e: exponent, m: mantisse)
     }
+
+    static func - (lhs: Double, rhs: Double) -> Double { lhs + -rhs }
 
     static func * (lhs: Double, rhs: Double) -> Double {
         if lhs == .zero || rhs == .zero { return .zero }
@@ -263,14 +252,14 @@ struct Double: Equatable {
     }
 }
 
-let ff = 1.1296
-let gg = -3.0
-let ss = pow(ff, gg)
+let ff = 1.0
+let gg = -1e-16
+let ss = ff + gg
 
 let f = Double(ff)
 let g = Double(gg)
 let h = Double(ss)
-let s = f ^ g
+let s = f + g
 print(ff)
 print(gg)
 print(ss)
