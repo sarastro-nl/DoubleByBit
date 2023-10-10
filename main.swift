@@ -62,6 +62,7 @@ struct Double: Equatable {
         if rhs == .zero { return lhs }
         if lhs == -rhs { return .zero }
         if abs(lhs) < abs(rhs) { return rhs + lhs }
+        if lhs.exponent - rhs.exponent > 52 { return lhs }
         if lhs.isNegative { return -(-lhs + -rhs) }
         let lmantisse = 1 << 52 + lhs.mantisse
         let rmantisse = (1 << 52 + rhs.mantisse) >> (lhs.exponent - rhs.exponent)
@@ -85,18 +86,28 @@ struct Double: Equatable {
         if lhs == .zero || rhs == .zero { return .zero }
         if lhs == .one { return rhs }
         if rhs == .one { return lhs }
-        if lhs.isNegative && rhs.isNegative { return -lhs * -rhs }
-        if lhs.isNegative { return -(-lhs * rhs) }
-        if rhs.isNegative { return -(lhs * -rhs) }
+        var r1: UInt = 0, r2: UInt = 0
+        var l1: UInt = 0, l2: UInt = 1 << 52 + lhs.mantisse
+        let rmantisse = 1 << 52 + rhs.mantisse
+        for i in (0...52) {
+            if rmantisse & 1 << i > 0 {
+                r1 += l1
+                let r = r2.addingReportingOverflow(l2)
+                if r.overflow { r1 += 1 }
+                r2 = r.partialValue
+            }
+            l1 <<= 1
+            if l2 & 1 << 63 > 0 { l1 += 1 }
+            l2 <<= 1
+        }
         var exponent = lhs.exponent + rhs.exponent - 1023
-        let m = (1 << 52 + lhs.mantisse).multipliedFullWidth(by: 1 << 52 + rhs.mantisse)
-        var mantisse = m.high << 12 + m.low >> 52
+        var mantisse = r1 << 12 + r2 >> 52
         if mantisse & 1 << 53 > 0 {
             exponent += 1
             mantisse >>= 1
         }
         mantisse -= 1 << 52
-        return Double(e: exponent, m: mantisse)
+        return Double(e: exponent, m: mantisse, n: lhs.isNegative != rhs.isNegative)
     }
     
     static func / (lhs: Double, rhs: Double) -> Double {
@@ -104,9 +115,6 @@ struct Double: Equatable {
         if lhs == .zero { return .zero }
         if rhs == .one { return lhs }
         if lhs == rhs { return .one }
-        if lhs.isNegative && rhs.isNegative { return -lhs / -rhs }
-        if lhs.isNegative { return -(-lhs / rhs) }
-        if rhs.isNegative { return -(lhs / -rhs) }
         var numerator = Double(e: 1022, m: lhs.mantisse)
         let denominator = Double(e: 1022, m: rhs.mantisse)
         var error = .one - denominator
@@ -114,7 +122,7 @@ struct Double: Equatable {
             numerator = numerator * (.one + error)
             error = error * error
         }
-        return Double(e: numerator.exponent + lhs.exponent - rhs.exponent, m: numerator.mantisse)
+        return Double(e: numerator.exponent + lhs.exponent - rhs.exponent, m: numerator.mantisse, n: lhs.isNegative != rhs.isNegative)
     }
     
     static func abs(_ operand: Double) -> Double {
@@ -252,14 +260,14 @@ struct Double: Equatable {
     }
 }
 
-let ff = 1.0
-let gg = -1e-16
-let ss = ff + gg
+let ff = 1.234
+let gg = -1.99
+let ss = pow(ff, gg)
 
 let f = Double(ff)
 let g = Double(gg)
 let h = Double(ss)
-let s = f + g
+let s = f ^ g
 print(ff)
 print(gg)
 print(ss)
