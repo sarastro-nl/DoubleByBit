@@ -49,20 +49,12 @@ struct Double: Equatable {
         if lhs.isNegative { return -lhs > -rhs }
         if lhs.exponent < rhs.exponent { return true }
         if lhs.exponent > rhs.exponent { return false }
-        if lhs.mantisse < rhs.mantisse { return true }
-        if lhs.mantisse > rhs.mantisse { return false }
-        return false
+        return lhs.mantisse < rhs.mantisse
     }
 
     static func > (lhs: Double, rhs: Double) -> Bool {
-        if lhs.isNegative && !rhs.isNegative { return false }
-        if !lhs.isNegative && rhs.isNegative { return true }
-        if lhs.isNegative { return -lhs < -rhs }
-        if lhs.exponent < rhs.exponent { return false }
-        if lhs.exponent > rhs.exponent { return true }
-        if lhs.mantisse < rhs.mantisse { return false }
-        if lhs.mantisse > rhs.mantisse { return true }
-        return false
+        if lhs == rhs { return false }
+        return !(lhs < rhs)
     }
 
     static func + (lhs: Double, rhs: Double) -> Double {
