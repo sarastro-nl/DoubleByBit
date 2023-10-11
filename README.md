@@ -14,6 +14,15 @@ It is stored as a `1.xxxxx` number times a power of `2` so the above number will
 
 This is a swift implementation of how a computer might handle doubles under the hood. It therefor uses bit operations only.
 
-The following operations are supported: `<`, `>`, `+`, `-`, `*`, `/`, `^`, `sqrt`, `sin`, `cos`, `tan` and `log`.
+The following operations are supported: `<`, `>`, `+`, `-`, `*`, `/`, `pow`, `sqrt`, `sin`, `cos`, `tan`, `log` and `exp`.
 
 For clarity reasons, the code is deliberately written without focus on rounding errors, overflow situations, `NaN`, `Inf` or efficiency, it's just to show how calculations with doubles could be done with bit operations only.
+
+This is an example of what you can do with it:
+
+```
+let f = DoubleByBit(1.234)
+let g = DoubleByBit(-1.99)
+let h = DoubleByBit.pow(f, g)
+print(h.doubleValue)         // 0.6580862733673336
+```
