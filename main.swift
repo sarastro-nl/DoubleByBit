@@ -17,6 +17,21 @@ struct DoubleByBit: Equatable {
     var isNegative: Bool { bytes & 1 << 63 > 0 }
     
     var doubleValue: Double { Double(bitPattern: bytes) }
+    
+    var bitPatternString: String {
+        var s = ""
+        for i in (0...63).reversed() {
+            if bytes & 1 << i > 0 {
+                s += "1"
+            } else {
+                s += "0"
+            }
+            if i % 8 == 0 {
+                s += " "
+            }
+        }
+        return s
+    }
 
     static prefix func - (operand: DoubleByBit) -> DoubleByBit {
         if operand == .zero { return operand }
@@ -227,19 +242,27 @@ struct DoubleByBit: Equatable {
     
     static func pow(_ lhs: DoubleByBit, _ rhs: DoubleByBit) -> DoubleByBit { exp(log(lhs) * rhs) }
     
-    var bitPatternString: String {
-        var s = ""
-        for i in (0...63).reversed() {
-            if bytes & 1 << i > 0 {
-                s += "1"
-            } else {
-                s += "0"
-            }
-            if i % 8 == 0 {
-                s += " "
-            }
+    static func atan(_ operand: DoubleByBit) -> DoubleByBit {
+        if operand == .zero { return .zero }
+        if operand.isNegative { return -atan(-operand) }
+        let quarter = DoubleByBit(e: 1021, m: 0)
+        var m = DoubleByBit.zero
+        var operand = operand
+        while operand > quarter {
+            operand = (operand - quarter) / (.one + (operand * quarter))
+            m = m + .one
         }
-        return s
+        let square = -operand * operand
+        var r = DoubleByBit.zero
+        var e = operand
+        var n = DoubleByBit.one
+        while r + e != r {
+            r = r + e
+            operand = operand * square
+            n = n + .two
+            e = operand / n
+        }
+        return r + m * DoubleByBit(e: 1020, m: 4322686900404445) // atan(0.25)
     }
 }
 
@@ -273,14 +296,14 @@ private extension String {
         shift = 52
         let n = data.digits[..<3].reduce(0, { ($0 * 10) + UInt($1) })
         var m: Int
-        if data.dp == 0 {
+        if data.dp == 0 {  // between 0.1 and 1.0
             switch n {
                 case 100..<125: m = -4
                 case 125..<250: m = -3
                 case 250..<500: m = -2
                 default: m = -1
             }
-        } else {
+        } else {           // between 1.0 and 10.0
             switch n {
                 case 100..<200: m = 0
                 case 200..<400: m = 1
@@ -416,12 +439,12 @@ private extension String {
 
 let ff = 1.234
 let gg = -1.99
-let ss = pow(ff, gg)
+let ss = atan(ff)
 
 let f = DoubleByBit(String(ff))
 let g = DoubleByBit(gg)
 let h = DoubleByBit(ss)
-let s = DoubleByBit.pow(f, g)
+let s = DoubleByBit.atan(f)
 print(ff)
 print(gg)
 print(ss)
