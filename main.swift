@@ -1,30 +1,22 @@
 import Foundation
 
 struct DoubleByBit: Equatable {
-    static let zero = DoubleByBit(0)
+    static let zero = DoubleByBit(e: 0, m: 0)
     static let one = DoubleByBit(e: 1023, m: 0)
     static let two = DoubleByBit(e: 1024, m: 0)
 
     var bytes: UInt64 = 0
 
     init(_ d: Double) { bytes = d.bitPattern }
-    
-    private init(e: UInt64, m: UInt64, n: Bool = false) {
-        guard e > 0, e < 2048, m < 1 << 52 else { fatalError("out of bounds") }
-        bytes = e << 52
-        bytes += m
-        if n { bytes |= 1 << 63}
-    }
+    init(_ s: String) { bytes = s.bitPattern }
+
+    private init(e: UInt64, m: UInt64, n: Bool = false) { bytes = e << 52 | m | (n ? 1 << 63 : 0) }
     
     var exponent: UInt64 { bytes >> 52 & (1 << 11 - 1) }
     var mantisse: UInt64 { bytes & (1 << 52 - 1) }
     var isNegative: Bool { bytes & 1 << 63 > 0 }
     
-    var doubleValue: Double {
-        if self == .zero { return 0 }
-        let r = Darwin.pow(2, Double(Int(exponent) - 1023)) * (Double(mantisse) * Darwin.pow(2, -52) + 1)
-        return isNegative ? -r : r
-    }
+    var doubleValue: Double { Double(bitPattern: bytes) }
 
     static prefix func - (operand: DoubleByBit) -> DoubleByBit {
         if operand == .zero { return operand }
@@ -235,18 +227,190 @@ struct DoubleByBit: Equatable {
     
     static func pow(_ lhs: DoubleByBit, _ rhs: DoubleByBit) -> DoubleByBit { exp(log(lhs) * rhs) }
     
-    func bitPattern() {
+    var bitPatternString: String {
+        var s = ""
         for i in (0...63).reversed() {
             if bytes & 1 << i > 0 {
-                print("1", terminator: "")
+                s += "1"
             } else {
-                print("0", terminator: "")
+                s += "0"
             }
             if i % 8 == 0 {
-                print(" ", terminator: "")
+                s += " "
             }
         }
-        print("")
+        return s
+    }
+}
+
+private extension String {
+    struct Data {
+        var dp: Int
+        var nrDigits: Int
+        var digits: [UInt8]
+        let isNegative: Bool
+    }
+
+    var bitPattern: UInt64 {
+        let powers: [UInt] = [
+            0,  3,  6,  9,  13, 16, 19, 23, 26, 29,
+            33, 36, 39, 43, 46, 49, 53, 56, 59,
+        ]
+        var data = parse()
+        if data.nrDigits == 0 { return 0 }
+        var shift: UInt = 0
+        var exp: UInt = 1023
+        while data.dp > 1 {
+            shift = data.dp < 19 ? powers[data.dp] : 60
+            rightShift(data: &data, shift: shift)
+            exp += shift
+        }
+        while data.dp < 0 {
+            shift = -data.dp < 19 ? powers[-data.dp] + 1 : 60
+            leftShift(data: &data, shift: shift)
+            exp -= shift
+        }
+        shift = 52
+        let n = data.digits[..<3].reduce(0, { ($0 * 10) + UInt($1) })
+        var m: Int
+        if data.dp == 0 {
+            switch n {
+                case 100..<125: m = -4
+                case 125..<250: m = -3
+                case 250..<500: m = -2
+                default: m = -1
+            }
+        } else {
+            switch n {
+                case 100..<200: m = 0
+                case 200..<400: m = 1
+                case 400..<800: m = 2
+                default: m = 3
+            }
+        }
+        exp = m < 0 ? exp - UInt(-m) : exp + UInt(m)
+        shift = m < 0 ? shift + UInt(-m) : shift - UInt(m)
+        leftShift(data: &data, shift: shift)
+        var mantisse: UInt64 = data.digits[..<16].reduce(0, { ($0 * 10) + UInt64($1) })
+        if data.nrDigits > 16 {
+            var roundUp = data.digits[16] >= 5
+            if data.digits[16] == 5 && data.nrDigits == 17 {
+                roundUp = 1 & data.digits[15] > 0
+            }
+            if roundUp {
+                mantisse += 1
+            }
+        }
+        return mantisse & (1 << 52 - 1) | UInt64(exp) << 52 | (data.isNegative ? 1 << 63 : 0)
+    }
+    
+    func leftShift(data: inout Data, shift: UInt) {
+        let extraDigits = [
+            0, 1, 1, 1, 2, 2, 2, 3, 3, 3, 4, 4, 4,
+            4, 5, 5, 5, 6, 6, 6, 7, 7, 7, 7, 8, 8,
+            8, 9, 9, 9, 10, 10, 10, 10, 11, 11, 11,
+            12, 12, 12, 13, 13, 13, 13, 14, 14, 14,
+            15, 15, 15, 16, 16, 16, 16, 17, 17, 17,
+            18, 18, 18, 19]
+        var extraDigit = extraDigits[Int(shift)]
+        var n: UInt = 0
+        var ir = data.nrDigits - 1
+        var iw = data.nrDigits - 1 + extraDigit
+        repeat {
+            n += UInt(data.digits[ir]) << shift; ir -= 1
+            data.digits[iw] = UInt8(n % 10); iw -= 1
+            n /= 10
+        } while ir >= 0
+        while n > 0 {
+            data.digits[iw] = UInt8(n % 10); iw -= 1
+            n /= 10
+        }
+        if iw == 0 {
+            data.digits.removeFirst()
+            data.digits.append(0)
+            extraDigit -= 1
+        }
+        data.nrDigits += extraDigit
+        data.dp += extraDigit
+        while data.digits[data.nrDigits - 1] == 0 {
+            data.nrDigits -= 1
+        }
+    }
+    
+    func rightShift(data: inout Data, shift: UInt) {
+        var n: UInt = 0
+        var ir = 0
+        var iw = 0
+        repeat {
+            n = (n * 10) + (ir < data.nrDigits ? UInt(data.digits[ir]) : 0); ir += 1
+        } while n >> shift == 0
+        data.dp -= ir - 1
+        let mask: UInt = 1 << shift - 1
+        repeat {
+            data.digits[iw] = UInt8(n >> shift); iw += 1
+            n = (n & mask) * 10 + (ir < data.nrDigits ? UInt(data.digits[ir]) : 0); ir += 1
+        } while n > 0
+        data.nrDigits = iw
+    }
+    
+    func parse() -> Data {
+        let pattern = #"^(?<sign>-|\+)?0*(?<integer>\d*)(\.(?<fraction>\d+?))?0*(e(?<exponent>(-|\+)?\d+))?$"#
+        guard let regex = try? NSRegularExpression(pattern: pattern, options: .caseInsensitive) else { fatalError("Parse error: \(self)") }
+        guard let match = regex.firstMatch(in: self, options: [], range: NSRange(location: 0, length: count)) else { fatalError("Parse error: \(self)") }
+        var dp = 0
+        var digits: [UInt8] = Array(repeating: 0, count: 1000)
+        var isNegative = false
+        var iw = 0
+        let string = self as NSString
+        let signRange = match.range(withName: "sign")
+        if signRange.length > 0, string.substring(with: signRange) == "-" {
+            isNegative = true
+        }
+        let integerRange = match.range(withName: "integer")
+        if integerRange.length > 0 {
+            let s = string.substring(with: integerRange)
+            dp = integerRange.length
+            for c in s {
+                if let ui = UInt8(String(c)) {
+                    digits[iw] = ui; iw += 1
+                }
+            }
+        }
+        let fractionRange = match.range(withName: "fraction")
+        if fractionRange.length > 0 {
+            var s = string.substring(with: fractionRange)
+            var index = 0
+            if iw == 0 {
+                for c in s {
+                    if c == "0" {
+                        index += 1
+                    } else {
+                        break
+                    }
+                }
+                if fractionRange.length > index {
+                    dp -= index
+                }
+            }
+            let newRange = NSRange(location: fractionRange.location + index, length: fractionRange.length - index)
+            s = string.substring(with: newRange)
+            for c in s {
+                if let ui = UInt8(String(c)) {
+                    digits[iw] = ui; iw += 1
+                }
+            }
+        }
+        while iw > 0 && digits[iw - 1] == 0 {
+            iw -= 1
+        }
+        let exponentRange = match.range(withName: "exponent")
+        if exponentRange.length > 0 {
+            let s = string.substring(with: exponentRange)
+            if let i = Int(s) {
+                dp += i
+            }
+        }
+        return Data(dp: dp, nrDigits: iw, digits: digits, isNegative: isNegative)
     }
 }
 
@@ -254,7 +418,7 @@ let ff = 1.234
 let gg = -1.99
 let ss = pow(ff, gg)
 
-let f = DoubleByBit(ff)
+let f = DoubleByBit(String(ff))
 let g = DoubleByBit(gg)
 let h = DoubleByBit(ss)
 let s = DoubleByBit.pow(f, g)
@@ -262,7 +426,7 @@ print(ff)
 print(gg)
 print(ss)
 print(s.doubleValue)
-f.bitPattern()
-g.bitPattern()
-h.bitPattern()
-s.bitPattern()
+print(f.bitPatternString)
+print(g.bitPatternString)
+print(h.bitPatternString)
+print(s.bitPatternString)
