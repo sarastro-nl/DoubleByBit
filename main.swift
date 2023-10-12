@@ -82,13 +82,11 @@ struct DoubleByBit: Equatable {
         let rmantisse = 1 << 52 + rhs.mantisse
         for i in (0...52) {
             if rmantisse & 1 << i > 0 {
-                r1 += l1
                 let r = r2.addingReportingOverflow(l2)
-                if r.overflow { r1 += 1 }
+                r1 += l1 + (r.overflow ? 1 : 0)
                 r2 = r.partialValue
             }
-            l1 <<= 1
-            if l2 & 1 << 63 > 0 { l1 += 1 }
+            l1 = l1 << 1 + (l2 & 1 << 63 > 0 ? 1 : 0)
             l2 <<= 1
         }
         var exponent = lhs.exponent + rhs.exponent - 1023
@@ -106,14 +104,13 @@ struct DoubleByBit: Equatable {
         if lhs == .zero { return .zero }
         if rhs == .one { return lhs }
         if lhs == rhs { return .one }
-        var numerator = DoubleByBit(e: 1022, m: lhs.mantisse)
-        let denominator = DoubleByBit(e: 1022, m: rhs.mantisse)
-        var error = .one - denominator
-        while .one + error > .one {
-            numerator = numerator * (.one + error)
-            error = error * error
+        var r = DoubleByBit(e: 1022, m: lhs.mantisse)
+        var e = .one - DoubleByBit(e: 1022, m: rhs.mantisse)
+        while .one + e > .one {
+            r = r * (.one + e)
+            e = e * e
         }
-        return DoubleByBit(e: numerator.exponent + lhs.exponent - rhs.exponent, m: numerator.mantisse, n: lhs.isNegative != rhs.isNegative)
+        return DoubleByBit(e: r.exponent + lhs.exponent - rhs.exponent, m: r.mantisse, n: lhs.isNegative != rhs.isNegative)
     }
     
     static func abs(_ operand: DoubleByBit) -> DoubleByBit {
