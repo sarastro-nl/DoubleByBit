@@ -29,9 +29,7 @@ struct DoubleByBit: Equatable {
 
     static prefix func - (operand: DoubleByBit) -> DoubleByBit {
         if operand == .zero { return operand }
-        var operand = operand
-        operand.bytes ^= 1 << 63
-        return operand
+        return DoubleByBit(e: operand.exponent, m: operand.mantisse, n: !operand.isNegative)
     }
     
     static func < (lhs: DoubleByBit, rhs: DoubleByBit) -> Bool {
@@ -113,10 +111,7 @@ struct DoubleByBit: Equatable {
         return DoubleByBit(e: r.exponent + lhs.exponent - rhs.exponent, m: r.mantisse, n: lhs.isNegative != rhs.isNegative)
     }
     
-    static func abs(_ operand: DoubleByBit) -> DoubleByBit {
-        if operand.isNegative { return -operand }
-        return operand
-    }
+    static func abs(_ operand: DoubleByBit) -> DoubleByBit { operand.isNegative ? -operand : operand }
     
     static func sqrt(_ operand: DoubleByBit) -> DoubleByBit {
         if operand.isNegative { fatalError() }
@@ -306,7 +301,7 @@ private extension String {
         shift = m < 0 ? shift + UInt64(-m) : shift - UInt64(m)
         leftShift(data: &data, shift: shift)
         let mantisse = data.digits[..<16].reduce(0, { ($0 * 10) + UInt64($1) }) - 1 << 52
-        return (data.isNegative ? 1 << 63 : 0) | exp << 52 | mantisse
+        return exp << 52 | mantisse | (data.isNegative ? 1 << 63 : 0)
     }
     
     func leftShift(data: inout Data, shift: UInt64) {
@@ -358,74 +353,47 @@ private extension String {
     }
     
     func parse() -> Data {
-        let pattern = #"^(?<sign>-|\+)?0*(?<integer>\d*)(\.(?<fraction>\d+?))?0*(e(?<exponent>(-|\+)?\d+))?$"#
-        guard let regex = try? NSRegularExpression(pattern: pattern, options: .caseInsensitive) else { fatalError("Parse error: \(self)") }
-        guard let match = regex.firstMatch(in: self, options: [], range: NSRange(location: 0, length: count)) else { fatalError("Parse error: \(self)") }
-        var dp = 0
-        var iw = 0
+        let regex = /^(?<sign>-|\+)?0*(?<integer>\d*)?(\.(?<fraction>\d+?))?0*((e|E)(?<exponent>(-|\+)?\d+))?$/
+        guard let match = firstMatch(of: regex) else { fatalError("Parse error: \(self)") }
         var digits: [UInt8] = Array(repeating: 0, count: 1000)
         var isNegative = false
-        let string = self as NSString
-        let signRange = match.range(withName: "sign")
-        if signRange.length > 0, string.substring(with: signRange) == "-" {
+        if match.sign == "-" {
             isNegative = true
         }
-        let integerRange = match.range(withName: "integer")
-        if integerRange.length > 0 {
-            let s = string.substring(with: integerRange)
-            dp = integerRange.length
+        var index = 0
+        if let s = match.integer {
             for c in s {
-                if let ui = UInt8(String(c)) {
-                    digits[iw] = ui; iw += 1
-                }
+                digits[index] = UInt8(String(c))!; index += 1
             }
         }
-        let fractionRange = match.range(withName: "fraction")
-        if fractionRange.length > 0 {
-            var s = string.substring(with: fractionRange)
-            var index = 0
-            if iw == 0 {
-                for c in s {
-                    if c == "0" {
-                        index += 1
-                    } else {
-                        break
-                    }
-                }
-                if fractionRange.length > index {
-                    dp -= index
-                }
+        var dp = index
+        if var s = match.fraction {
+            if dp == 0, let index = s.firstIndex(where: { c in c != "0" }) {
+                dp = -s.distance(from: s.startIndex, to: index)
+                s = s.suffix(from: index)
             }
-            let newRange = NSRange(location: fractionRange.location + index, length: fractionRange.length - index)
-            s = string.substring(with: newRange)
             for c in s {
-                if let ui = UInt8(String(c)) {
-                    digits[iw] = ui; iw += 1
-                }
+                digits[index] = UInt8(String(c))!; index += 1
             }
         }
-        while iw > 0 && digits[iw - 1] == 0 {
-            iw -= 1
+        if let s = match.exponent, let i = Int(s) {
+            dp += i
         }
-        let exponentRange = match.range(withName: "exponent")
-        if exponentRange.length > 0 {
-            let s = string.substring(with: exponentRange)
-            if let i = Int(s) {
-                dp += i
-            }
+        while index > 0 && digits[index - 1] == 0 {
+            index -= 1
         }
-        return Data(dp: dp, nrDigits: iw, digits: digits, isNegative: isNegative)
+        return Data(dp: dp, nrDigits: index, digits: digits, isNegative: isNegative)
     }
 }
 
 let ff = 1.234
 let gg = -1.99
-let ss = atan(ff)
+let ss = pow(ff, gg)
 
 let f = DoubleByBit(String(ff))
-let g = DoubleByBit(gg)
+let g = DoubleByBit(String(gg))
 let h = DoubleByBit(ss)
-let s = DoubleByBit.atan(f)
+let s = DoubleByBit.pow(f, g)
 print(ff)
 print(gg)
 print(ss)
