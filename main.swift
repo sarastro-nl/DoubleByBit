@@ -46,6 +46,8 @@ struct DoubleByBit: Equatable {
         return !(lhs < rhs)
     }
 
+    static func abs(_ operand: DoubleByBit) -> DoubleByBit { operand.isNegative ? -operand : operand }
+    
     static func + (lhs: DoubleByBit, rhs: DoubleByBit) -> DoubleByBit {
         if lhs == .zero { return rhs }
         if rhs == .zero { return lhs }
@@ -109,8 +111,6 @@ struct DoubleByBit: Equatable {
         }
         return DoubleByBit(e: r.exponent + lhs.exponent - rhs.exponent, m: r.mantisse, n: lhs.isNegative != rhs.isNegative)
     }
-    
-    static func abs(_ operand: DoubleByBit) -> DoubleByBit { operand.isNegative ? -operand : operand }
     
     static func sqrt(_ operand: DoubleByBit) -> DoubleByBit {
         if operand.isNegative { fatalError() }
