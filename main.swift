@@ -52,11 +52,10 @@ struct DoubleByBit: Equatable {
         if lhs == -rhs { return .zero }
         if abs(lhs) < abs(rhs) { return rhs + lhs }
         if lhs.exponent - rhs.exponent > 52 { return lhs }
-        if lhs.isNegative { return -(-lhs + -rhs) }
         let lmantisse = 1 << 52 + lhs.mantisse
         let rmantisse = (1 << 52 + rhs.mantisse) >> (lhs.exponent - rhs.exponent)
         var exponent = lhs.exponent
-        var mantisse = rhs.isNegative ? lmantisse - rmantisse : lmantisse + rmantisse
+        var mantisse = lhs.isNegative == rhs.isNegative ? lmantisse + rmantisse : lmantisse - rmantisse
         if mantisse & 1 << 53 > 0 {
             exponent += 1
             mantisse >>= 1
@@ -66,7 +65,7 @@ struct DoubleByBit: Equatable {
             mantisse <<= 1
         }
         mantisse -= 1 << 52
-        return DoubleByBit(e: exponent, m: mantisse)
+        return DoubleByBit(e: exponent, m: mantisse, n: lhs.isNegative)
     }
 
     static func - (lhs: DoubleByBit, rhs: DoubleByBit) -> DoubleByBit { lhs + -rhs }
@@ -368,7 +367,7 @@ private extension String {
         }
         var dp = index
         if var s = match.fraction {
-            if dp == 0, let index = s.firstIndex(where: { c in c != "0" }) {
+            if dp == 0, let index = s.firstIndex(where: { $0 != "0" }) {
                 dp = -s.distance(from: s.startIndex, to: index)
                 s = s.suffix(from: index)
             }
