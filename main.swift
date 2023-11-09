@@ -300,7 +300,7 @@ private extension String {
         shift = m < 0 ? shift + UInt64(-m) : shift - UInt64(m)
         leftShift(data: &data, shift: shift)
         let mantisse = data.digits[..<16].reduce(0, { ($0 * 10) + UInt64($1) }) - 1 << 52
-        return exp << 52 | mantisse | (data.isNegative ? 1 << 63 : 0)
+        return (data.isNegative ? 1 << 63 : 0) | exp << 52 | mantisse
     }
     
     func leftShift(data: inout Data, shift: UInt64) {
@@ -316,14 +316,10 @@ private extension String {
         var ir = data.nrDigits - 1
         var iw = data.nrDigits - 1 + extraDigits
         repeat {
-            n += UInt64(data.digits[ir]) << shift; ir -= 1
+            n += data.digits[safe: ir] << shift; ir -= 1
             data.digits[iw] = UInt8(n % 10); iw -= 1
             n /= 10
-        } while ir >= 0
-        while n > 0 {
-            data.digits[iw] = UInt8(n % 10); iw -= 1
-            n /= 10
-        }
+        } while n > 0
         if iw == 0 {
             data.digits.removeFirst()
             data.digits.append(0)
@@ -341,12 +337,12 @@ private extension String {
         var ir = 0
         var iw = 0
         repeat {
-            n = (n * 10) + (ir < data.nrDigits ? UInt64(data.digits[ir]) : 0); ir += 1
+            n = (n * 10) + data.digits[safe: ir]; ir += 1
         } while n >> shift == 0
         data.dp -= ir - 1
         repeat {
             data.digits[iw] = UInt8(n >> shift); iw += 1
-            n = (n & (1 << shift - 1)) * 10 + (ir < data.nrDigits ? UInt64(data.digits[ir]) : 0); ir += 1
+            n = (n & (1 << shift - 1)) * 10 + data.digits[safe: ir]; ir += 1
         } while n > 0
         data.nrDigits = iw
     }
@@ -383,6 +379,10 @@ private extension String {
         }
         return Data(dp: dp, nrDigits: index, digits: digits, isNegative: isNegative)
     }
+}
+
+private extension Array where Element == UInt8 {
+    subscript(safe index: Int) -> UInt64 { (0..<count).contains(index) ? UInt64(self[index]) : 0 }
 }
 
 let ff = 1.234
